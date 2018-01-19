@@ -1,4 +1,5 @@
-# FWF
+FWF
+===
 
 [![Build Status](https://travis-ci.org/bkamins/FWF.jl.svg?branch=master)](https://travis-ci.org/bkamins/FWF.jl)
 [![codecov.io](http://codecov.io/github/bkamins/FWF.jl/coverage.svg?branch=master)](http://codecov.io/github/bkamins/FWF.jl?branch=master)
