@@ -8,8 +8,8 @@ a b c
 7 8 x
 """
 x = FWF.read(IOBuffer(test), [2,2,1], parsers=[:str, :int, :float])
-@test x.names == [:a, :b, :c]
 @test isequal(x.data, [["1", "4", "7"],[2, 5, 8],[3.0, 6.0, missing]])
+@test x.names == [:a, :b, :c]
 
 io = IOBuffer(UInt8[], false, true)
 m = [1 2 3
@@ -24,3 +24,4 @@ ref = """
 """
 @test s == ref
 
+# add tests for all scenarios

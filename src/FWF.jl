@@ -10,17 +10,20 @@ function parsefwf_line(line, widths::AbstractVector{Int})
     i = 0
     j = -1
     idx = 1
+    malformed = false
+    e = endof(line)
     for k in 1:length(widths)
         w = widths[k]
         j = nextind(line, i, w)
-        if k == length(widths) # allow last column not to have full width
-            j = min(j, endof(line))
+        if j > e
+            j = e
+            malformed = true
         end
         buf[idx] = SubString(line, i+1, j)
         i = j
         idx += 1
     end
-    buf
+    (buf, malformed)
 end
 
 function nextline(source, widths, skipblank)
@@ -28,7 +31,8 @@ function nextline(source, widths, skipblank)
     while skipblank && isempty(line) && !eof(source)
         line = readline(source)
     end
-    isempty(line) && eof(source) && return Vector{SubString{String}}[]
+    # special case if we skip blanks and find only empty lines
+    skipblank && isempty(line) && eof(source) && return (Vector{SubString{String}}[], false)
     parsefwf_line(line, widths)
 end
 
@@ -52,15 +56,24 @@ Inbuilt parserss:
 const PARSERS = Dict(:raw => raw_parse, :str => str_parse, :nastr => nastr_parse,
                      :int => int_parse, :float => float_parse)
 
+function emiterror(msg, errorlevel)
+    errorlevel == :error && error(msg)
+    errorlevel == :warn && warn(msg)
+end
+
 """
 `read(source, widths; header, skip, nrow, skipblank, parsers)`
 
 Reads fixed wdith format file or stream `source` assuming that its fields have widths
-`widths`.
+`widths`. Decodes what is possible to decode from a file (`errorlevel` handles reaction
+to malformed input data).
 
 Returns a `NamedTuple` with fields:
-* `names`: names of data columns as `Symbol`
 * `data`: vector of vectors containing data
+* `names`: names of data columns as `Symbol`
+
+If you use DataFrames the return value `ret` can be simply changed to a `DataFrame`
+by writing `DataFrame(ret...)`.
 
 Parameters:
 * `source::Union{IO, AbstractString}`: stream or filename to read from
@@ -71,18 +84,23 @@ Parameters:
 * `skipblank::Bool=true`: if empty lines shoud be skipped
 * `parsers::AbstractVector{Symbol}=[:str...]`: list of parserss symbols read from `PARSERS`
    dictionary; must have the same number of elements as `widths`
+* `errorlevel::Symbol`: if `:error` then error is emited if malformed line is encoutered,
+  if `:warn` a warning is printed; otherwise nothing happens
 """
 function read(source::IO, widths::AbstractVector{Int};
               header::Bool=true, skip::Int=0, nrow::Int=0, skipblank::Bool=true,
-              parsers::AbstractVector{Symbol}=[:str for i in 1:length(widths)])
+              parsers::AbstractVector{Symbol}=[:str for i in 1:length(widths)],
+              errorlevel::Symbol=:warn)
     length(parsers) == length(widths) || throw(ArgumentError("wrong number of parserss"))
     any(x -> x < 1, widths) && throw(ArgumentError("field widths must be positive"))
     for i in 1:skip
         line = readline(source)
     end
     if header
-        pline = nextline(source, widths, skipblank)
-        isempty(pline) && error("Header was required and is missing")
+        pline, malformed = nextline(source, widths, skipblank)
+        if malformed || length(pline) == 0
+            emiterror("Header was required and is malformed", errorlevel)
+        end
         head = Symbol.(strip.(pline))
     else
         head = Symbol.(["x$i" for i in 1:length(widths)])
@@ -90,26 +108,63 @@ function read(source::IO, widths::AbstractVector{Int};
 
     rawdata = [SubString{String}[] for i in 1:length(widths)]
     row = 0
-    while row < nrow || nrow == 0
-        pline = nextline(source, widths, skipblank)
-        isempty(pline) && break
+    while (row < nrow || nrow == 0) && !eof(source)
+        row += 1
+        pline, malformed = nextline(source, widths, skipblank)
+        # below row does not count header and blank lines if skipblank is on
+        malformed && emiterror("Malformed actual data line number $row", errorlevel)
         for i in 1:length(pline)
             push!(rawdata[i], pline[i])
         end
-        row += 1
     end
     # TODO: properly handle Missing in Union; to be fixed in Julia 0.7 hopefully
     data = Any[PARSERS[parsers[i]].(rawdata[i]) for i in 1:length(rawdata)]
-    (names=head, data=data)
+    (data=data, names=head)
 end
 
 function read(source::AbstractString, widths::AbstractVector{Int};
               header::Bool=true, skip::Int=0, nrow::Int=0, skipblank::Bool=true,
-              parsers::AbstractVector{Symbol}=[:str for i in 1:length(widths)])
+              parsers::AbstractVector{Symbol}=[:str for i in 1:length(widths)],
+              errorlevel::Symbol=:warn)
     open(source) do handle
         readfwf(handle, widths, header=header, skip=skip, nrow=nrow,
                 skipblank=skipblank, parsers=parsers)
     end
+end
+
+"""
+`impute(vs, na)
+
+Takes a string vector `vs` and tries to convert it to `Int` or `Float64` if possible.
+Handles `missing` in `vs` and also converts `na` to `missing`.
+
+Parameters:
+* `vs::AbstractVector{<:Union{AbstractString, Missing}}`: data to perform imputation for
+* `na::AbstractString`: string that is to be converted to `missing`, e.g. `""` or `"NA"`
+"""
+function impute(vs::AbstractVector{Union{AbstractString, Missing}}, na::AbstractString="")
+    can_int = true
+    can_float = true
+    had_missing = false
+    for s in vs
+        if ismissing(s) || s == na
+            had_missing = ture
+        else
+            isa(tryparse(Int, x), Nothing) && (can_int = false)
+            isa(tryparse(Float64, x), Nothing) && (can_float = false)
+        end
+    end
+    if can_int
+        # TODO: properly handle Missing in Union; to be fixed in Julia 0.7 hopefully
+        return [ismissing(s) || s == na ? missing : parse(Int, s) for s in vs]
+    end
+    if ca_float
+        # TODO: properly handle Missing in Union; to be fixed in Julia 0.7 hopefully
+        return [ismissing(s) || s == na ? missing : parse(Float64, s) for s in vs]
+    end
+
+    # TODO: properly handle Missing in Union; to be fixed in Julia 0.7 hopefully
+    [ismissing(s) || s == na ? missing : string(s) for s in vs]
 end
 
 """
