@@ -14,6 +14,6 @@ Available functions:
 * reading file: `FWF.read`
 * writing file: `FWF.write`
 * scan for field widths: `FWF.scan`
-* impute field types after reading data `FWF.impute`
+* impute field types after reading data: `FWF.impute`
 * parsers dictionary: `FWF.PARSERS`
 
