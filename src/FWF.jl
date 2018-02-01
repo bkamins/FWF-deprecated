@@ -82,6 +82,7 @@ Parameters:
 * `skip::Int=0`: number of lines to skip at the beginning of the file
 * `nrow::Int=0`: number of rows containing data to read; `0` means to read all data
 * `skipblank::Bool=true`: if empty lines shoud be skipped
+* `keep::AbstractVector{Bool}=[true...]`: which columns should be retained in the result
 * `parsers::AbstractVector{Symbol}=[:str...]`: list of parserss symbols read from `PARSERS`
    dictionary; must have the same number of elements as `widths`
 * `errorlevel::Symbol`: if `:error` then error is emited if malformed line is encoutered,
@@ -89,9 +90,11 @@ Parameters:
 """
 function read(source::IO, widths::AbstractVector{Int};
               header::Bool=true, skip::Int=0, nrow::Int=0, skipblank::Bool=true,
+              keep::AbstractVector{Bool}=[true for i in 1:length(widths)],
               parsers::AbstractVector{Symbol}=[:str for i in 1:length(widths)],
               errorlevel::Symbol=:warn)
     length(parsers) == length(widths) || throw(ArgumentError("wrong number of parserss"))
+    length(keep) == length(widths) || throw(ArgumentError("wrong length of keep"))
     any(x -> x < 1, widths) && throw(ArgumentError("field widths must be positive"))
     for i in 1:skip
         line = readline(source)
@@ -119,7 +122,7 @@ function read(source::IO, widths::AbstractVector{Int};
     end
     # TODO: properly handle Missing in Union; to be fixed in Julia 0.7 hopefully
     data = Any[PARSERS[parsers[i]].(rawdata[i]) for i in 1:length(rawdata)]
-    (data=data, names=head)
+    (data=data[keep], names=head[keep])
 end
 
 function read(source::AbstractString, widths::AbstractVector{Int};

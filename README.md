@@ -6,6 +6,8 @@ FWF
 
 *A simple package for working with fixed width format files*
 
+This is work in progress.
+
 The module does not export any methods. Usage is documented in docstrings.
 The module does not have any depenencies, but is designed to allow for a simple
 integration with other packages like *DataFrames*.
