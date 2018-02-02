@@ -36,33 +36,13 @@ function nextline(source, widths, skipblank)
     parsefwf_line(line, widths)
 end
 
-raw_parse(x) = x
-str_parse(x) = String(strip(x))
-nastr_parse(x) = (v = String(strip(x)); isempty(v) ? missing : v)
-int_parse(x) = (v = tryparse(Int, x); isa(v, Nothing) ? missing : v)
-float_parse(x) = (v = tryparse(Float64, x); isa(v, Nothing) ? missing : v)
-
-"""
-A dictionary `Dict{Symbol, Function}` containing column parserss.
-A parsers takes a string and should return a value.
-Parsers symbols are used by `parsers` keyword argument of `read`.
-Inbuilt parserss:
-* `:raw`: no transformation applied, returns `SubString{String}`
-* `:str`: strips whitespace from the argument, returns `String`
-* `:nastr`: same as `:str` but empty string are converted to `missing`
-* `:int`: returns `Union{Int, Missing}`, `missing` produced for any invalid input
-* `:float`: returns `Union{Float64, Missing}`, `missing` produced for any invalid input
-"""
-const PARSERS = Dict(:raw => raw_parse, :str => str_parse, :nastr => nastr_parse,
-                     :int => int_parse, :float => float_parse)
-
 function emiterror(msg, errorlevel)
     errorlevel == :error && error(msg)
     errorlevel == :warn && warn(msg)
 end
 
 """
-`read(source, widths; header, skip, nrow, skipblank, parsers)`
+`read(source, widths; header, skip, nrow, skipblank, keep, parsers, errorlevel)`
 
 Reads fixed wdith format file or stream `source` assuming that its fields have widths
 `widths`. Decodes what is possible to decode from a file (`errorlevel` handles reaction
@@ -83,19 +63,19 @@ Parameters:
 * `nrow::Int=0`: number of rows containing data to read; `0` means to read all data
 * `skipblank::Bool=true`: if empty lines shoud be skipped
 * `keep::AbstractVector{Bool}=[true...]`: which columns should be retained in the result
-* `parsers::AbstractVector{Symbol}=[:str...]`: list of parserss symbols read from `PARSERS`
-   dictionary; must have the same number of elements as `widths`
+* `parsers::AbstractVector{Function}=[identity...]`: list of parsers functions;
+   must have the same number of elements as `widths`
 * `errorlevel::Symbol`: if `:error` then error is emited if malformed line is encoutered,
   if `:warn` a warning is printed; otherwise nothing happens
 """
 function read(source::IO, widths::AbstractVector{Int};
               header::Bool=true, skip::Int=0, nrow::Int=0, skipblank::Bool=true,
               keep::AbstractVector{Bool}=[true for i in 1:length(widths)],
-              parsers::AbstractVector{Symbol}=[:str for i in 1:length(widths)],
+              parsers::AbstractVector{Function}=[identity for i in 1:length(widths)],
               errorlevel::Symbol=:warn)
     length(parsers) == length(widths) || throw(ArgumentError("wrong number of parserss"))
     length(keep) == length(widths) || throw(ArgumentError("wrong length of keep"))
-    any(x -> x < 1, widths) && throw(ArgumentError("field widths must be positive"))
+    all(x -> x > 0, widths) || throw(ArgumentError("field widths must be positive"))
     for i in 1:skip
         line = readline(source)
     end
@@ -104,7 +84,7 @@ function read(source::IO, widths::AbstractVector{Int};
         if malformed || length(pline) == 0
             emiterror("Header was required and is malformed", errorlevel)
         end
-        head = Symbol.(strip.(pline))
+        head = Symbol.(pline)
     else
         head = Symbol.(["x$i" for i in 1:length(widths)])
     end
@@ -121,17 +101,18 @@ function read(source::IO, widths::AbstractVector{Int};
         end
     end
     # TODO: properly handle Missing in Union; to be fixed in Julia 0.7 hopefully
-    data = Any[PARSERS[parsers[i]].(rawdata[i]) for i in 1:length(rawdata)]
+    data = Any[parsers[i].(rawdata[i]) for i in 1:length(rawdata)]
     (data=data[keep], names=head[keep])
 end
 
 function read(source::AbstractString, widths::AbstractVector{Int};
               header::Bool=true, skip::Int=0, nrow::Int=0, skipblank::Bool=true,
-              parsers::AbstractVector{Symbol}=[:str for i in 1:length(widths)],
+              keep::AbstractVector{Bool}=[true for i in 1:length(widths)],
+              parsers::AbstractVector{Function}=[identity for i in 1:length(widths)],
               errorlevel::Symbol=:warn)
     open(source) do handle
         readfwf(handle, widths, header=header, skip=skip, nrow=nrow,
-                skipblank=skipblank, parsers=parsers)
+                skipblank=skipblank, keep=keep, parsers=parsers)
     end
 end
 
@@ -140,34 +121,33 @@ end
 
 Takes a string vector `vs` and tries to convert it to `Int` or `Float64` if possible.
 Handles `missing` in `vs` and also converts `na` to `missing`.
+On failure returns original string.
 
 Parameters:
 * `vs::AbstractVector{<:Union{AbstractString, Missing}}`: data to perform imputation for
-* `na::AbstractString`: string that is to be converted to `missing`, e.g. `""` or `"NA"`
+* `na::Union{AbstractString,Regex}`: string or pattern that is to be
+  converted to `missing`, e.g. `""` or `"NA"`. By default `r"^\s*(NA)?\s*$"`
 """
-function impute(vs::AbstractVector{Union{AbstractString, Missing}}, na::AbstractString="")
+function impute(vs::AbstractVector{<:Union{AbstractString, Missing}},
+                na::Union{AbstractString,Regex}=r"^\s*(NA)?\s*$")
+    length(vs) == 0 && return vs
     can_int = true
     can_float = true
-    had_missing = false
     for s in vs
-        if ismissing(s) || s == na
-            had_missing = ture
-        else
-            isa(tryparse(Int, x), Nothing) && (can_int = false)
-            isa(tryparse(Float64, x), Nothing) && (can_float = false)
+        if !(ismissing(s) || contains(s, na))
+            isa(tryparse(Int, s), Nothing) && (can_int = false)
+            isa(tryparse(Float64, s), Nothing) && (can_float = false)
         end
     end
     if can_int
         # TODO: properly handle Missing in Union; to be fixed in Julia 0.7 hopefully
-        return [ismissing(s) || s == na ? missing : parse(Int, s) for s in vs]
+        return [ismissing(s) || contains(s, na) ? missing : parse(Int, s) for s in vs]
     end
-    if ca_float
+    if can_float
         # TODO: properly handle Missing in Union; to be fixed in Julia 0.7 hopefully
-        return [ismissing(s) || s == na ? missing : parse(Float64, s) for s in vs]
+        return [ismissing(s) || contains(s, na) ? missing : parse(Float64, s) for s in vs]
     end
-
-    # TODO: properly handle Missing in Union; to be fixed in Julia 0.7 hopefully
-    [ismissing(s) || s == na ? missing : string(s) for s in vs]
+    vs
 end
 
 """
@@ -234,6 +214,37 @@ function scan(source::AbstractString, blank::Base.Chars=Base._default_delims;
     open(source) do handle
         scan(handle, blank, skip=skip, nrow=nrow, skipblank=skipblank)
     end
+end
+
+"""
+`range2width(r::AbstractArray{Tuple{Int, Int}})`
+
+Converts a vector of field ranges into a pair of field widths and keep vector.
+
+Example:
+```
+julia> range2width([(1,1), (3,3), (4,5)])
+(width = [1, 1, 1, 2], keep = Bool[true, false, true, true])
+```
+"""
+function range2width(r::AbstractArray{Tuple{Int, Int}})
+    width = Int[]
+    keep = Bool[]
+    old_hi = 0
+    for (lo, hi) in r
+        lo > hi && throw(ArgumentError("lo may not be greater than hi in range"))
+        if lo ≤ old_hi
+            lo < 1 && throw(ArgumentError("ranges must be positive"))
+            throw(ArgumentError("ranges must be non overlapping"))
+        elseif lo > old_hi + 1
+            push!(width, lo - old_hi - 1)
+            push!(keep, false)
+        end
+        push!(width, hi-lo+1)
+        push!(keep, true)
+        old_hi = hi
+    end
+    (width=width, keep=keep)
 end
 
 stringmissing(v, na::String) = ismissing(v) ? na : string(v)
