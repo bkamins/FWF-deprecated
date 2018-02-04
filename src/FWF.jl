@@ -32,6 +32,7 @@ function nextline(source, widths, skipblank)
         line = readline(source)
     end
     # special case if we skip blanks and find only empty lines
+    # TODO: rethink it
     skipblank && isempty(line) && eof(source) && return (Vector{SubString{String}}[], false)
     parsefwf_line(line, widths)
 end
@@ -63,7 +64,7 @@ Parameters:
 * `source::Union{IO, AbstractString}`: stream or file name to read from
   (only file name is accepted when autodetection of columns is required)
 * `widths::AbstractVector{Int}`: vector of column widths
-* `ranges::AbstractVector{Tuple{Int,Int}}: vector of tuples of column ranges
+* `ranges::AbstractVector{UnitRange{Int}}: vector of tuples of column ranges
 * `blank::Base.Chars=Base._default_delims`: characters that are assumed to be blanks for
   autodetection of columns in the data;
 * `header::Bool=true`: does `source` contain a header; if not a default header is created
@@ -78,7 +79,6 @@ Parameters:
 * `errorlevel::Symbol`: if `:error` then error is emited if malformed line is encoutered,
   if `:warn` a warning is printed; otherwise nothing happens
 """
-
 function read(source::IO, widths::AbstractVector{Int};
               header::Bool=true, stripheader::Union{Nothing, Base.Chars}=Base._default_delims,
               skip::Int=0, nrow::Int=0, skipblank::Bool=true,
@@ -114,6 +114,7 @@ function read(source::IO, widths::AbstractVector{Int};
         end
     end
     # TODO: properly handle Missing in Union; to be fixed in Julia 0.7 hopefully
+    # TODO: check eof without skipblank
     data = Any[parsers[i].(rawdata[i]) for i in 1:length(rawdata)]
     (data=data[keep], names=head[keep])
 end
@@ -130,7 +131,7 @@ function read(source::AbstractString, widths::AbstractVector{Int};
     end
 end
 
-function read(source::Union{IO, AbstractString}, ranges::AbstractVector{Tuple{Int,Int}};
+function read(source::Union{IO, AbstractString}, ranges::AbstractVector{UnitRange{Int}};
               header::Bool=true, stripheader::Union{Nothing, Base.Chars}=_default_delims,
               skip::Int=0, nrow::Int=0, skipblank::Bool=true,
               parsers::AbstractVector{Function}=[identity for i in 1:length(widths)],
@@ -161,7 +162,7 @@ On failure returns original string.
 Parameters:
 * `vs::AbstractVector{<:Union{AbstractString, Missing}}`: data to perform imputation for
 * `na::Union{AbstractString,Regex}`: string or pattern that is to be
-  converted to `missing`, e.g. `""` or `"NA"`. By default `r"^\s*(NA)?\s*$"`
+  converted to `missing`, e.g. `""` or `"NA"`. By default `r"^\\s*(NA)?\\s*\$"`
 """
 function impute(vs::AbstractVector{<:Union{AbstractString, Missing}},
                 na::Union{AbstractString,Regex}=r"^\s*(NA)?\s*$")
@@ -189,7 +190,7 @@ end
 `scan(source, blank; skip, nrow, skipblank)
 
 Reads fixed wdith format file or stream `source`.
-Returns `Vector{Tuple{Int,Int}}` with autotetected fields in `source`.
+Returns `Vector{UnitRange{Int}}` with autotetected fields in `source`.
 Detects only fields that exist in all checked lines.
 
 Parameters:
@@ -209,12 +210,14 @@ function scan(source::IO, blank::Base.Chars=Base._default_delims;
     maxwidth = 0
     firstline = true
     row = 0
-    while row < nrow || nrow == 0
+    while (row < nrow || nrow == 0) && !eof(source)
         line = readline(source)
-        while skipblank && isempty(line) && !eof(source)
-            line = readline(source)
+        if skipblank
+            while isempty(line) && !eof(source)
+                line = readline(source)
+            end
+            isempty(line) && eof(source) && break
         end
-        isempty(line) && eof(source) && break
         thisblank = Int[]
         for (i, c) in enumerate(line)
             c in blank && push!(thisblank, i)
@@ -228,13 +231,16 @@ function scan(source::IO, blank::Base.Chars=Base._default_delims;
         maxwidth = max(maxwidth, length(line))
         row += 1
     end
-    allblank[end] < maxwidth && push!(allblank, maxwidth+1)
+    # if character at maxwidth character index was not blank
+    # add a virtual blank at maxwidth+1
+    (isempty(allblank) || allblank[end] < maxwidth) && push!(allblank, maxwidth+1)
     last_blank = 0
-    range = Tuple{Int,Int}[]
+    range = UnitRange{Int}[]
     maxwidth == 0 && return range
     for this_blank in allblank
+        # do not create zero width columns
         if this_blank > last_blank + 1
-            push!(range, (last_blank+1, this_blank-1))
+            push!(range, (last_blank+1):(this_blank-1))
         end
         last_blank = this_blank
     end
@@ -249,7 +255,7 @@ function scan(source::AbstractString, blank::Base.Chars=Base._default_delims;
 end
 
 """
-`range2width(r::AbstractArray{Tuple{Int, Int}})`
+`range2width(r::AbstractArray{UnitRange{Int}})`
 
 Converts a vector of field ranges into a pair of field widths and keep vector.
 
@@ -259,11 +265,13 @@ julia> range2width([(1,1), (3,3), (4,5)])
 (width = [1, 1, 1, 2], keep = Bool[true, false, true, true])
 ```
 """
-function range2width(r::AbstractArray{Tuple{Int, Int}})
+function range2width(r::AbstractArray{UnitRange{Int}})
     width = Int[]
     keep = Bool[]
     old_hi = 0
-    for (lo, hi) in r
+    for ur in r
+        lo = ur.start
+        hi = ur.stop
         lo > hi && throw(ArgumentError("lo may not be greater than hi in range"))
         if lo ≤ old_hi
             lo < 1 && throw(ArgumentError("ranges must be positive"))
