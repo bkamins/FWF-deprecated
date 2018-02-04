@@ -60,7 +60,8 @@ If you use DataFrames the return value `ret` can be simply changed to a `DataFra
 by writing `DataFrame(ret...)`.
 
 Parameters:
-* `source::Union{IO, AbstractString}`: stream or filename to read from
+* `source::Union{IO, AbstractString}`: stream or file name to read from
+  (only file name is accepted when autodetection of columns is required)
 * `widths::AbstractVector{Int}`: vector of column widths
 * `ranges::AbstractVector{Tuple{Int,Int}}: vector of tuples of column ranges
 * `blank::Base.Chars=Base._default_delims`: characters that are assumed to be blanks for
@@ -72,7 +73,8 @@ Parameters:
 * `skipblank::Bool=true`: if empty lines shoud be skipped
 * `keep::AbstractVector{Bool}=[true...]`: which columns should be retained in the result
 * `parsers::AbstractVector{Function}=[identity...]`: list of parsers functions;
-   must have the same number of elements as `widths`
+   must have the same number of elements as `widths`; by default no parsing is performed;
+   you can use FWF.impute later if you want to autodetect numeric columns in the data
 * `errorlevel::Symbol`: if `:error` then error is emited if malformed line is encoutered,
   if `:warn` a warning is printed; otherwise nothing happens
 """
