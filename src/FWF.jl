@@ -59,6 +59,7 @@ Parameters:
 * `source::Union{IO, AbstractString}`: stream or filename to read from
 * `widths::AbstractVector{Int}`: vector of column widths
 * `header::Bool=true`: does `source` contain a header; if not a default header is created
+* `stripheader::Union{Nothing, Base.Chars}: characters to strip from header
 * `skip::Int=0`: number of lines to skip at the beginning of the file
 * `nrow::Int=0`: number of rows containing data to read; `0` means to read all data
 * `skipblank::Bool=true`: if empty lines shoud be skipped
@@ -69,7 +70,8 @@ Parameters:
   if `:warn` a warning is printed; otherwise nothing happens
 """
 function read(source::IO, widths::AbstractVector{Int};
-              header::Bool=true, skip::Int=0, nrow::Int=0, skipblank::Bool=true,
+              header::Bool=true, stripheader::Union{Nothing, Base.Chars}=Base._default_delims,
+              skip::Int=0, nrow::Int=0, skipblank::Bool=true,
               keep::AbstractVector{Bool}=[true for i in 1:length(widths)],
               parsers::AbstractVector{Function}=[identity for i in 1:length(widths)],
               errorlevel::Symbol=:warn)
@@ -84,7 +86,8 @@ function read(source::IO, widths::AbstractVector{Int};
         if malformed || length(pline) == 0
             emiterror("Header was required and is malformed", errorlevel)
         end
-        head = Symbol.(pline)
+        sline = stripheader === nothing ? pline : strip.(pline, stripheader)
+        head = Symbol.(sline)
     else
         head = Symbol.(["x$i" for i in 1:length(widths)])
     end
@@ -106,7 +109,8 @@ function read(source::IO, widths::AbstractVector{Int};
 end
 
 function read(source::AbstractString, widths::AbstractVector{Int};
-              header::Bool=true, skip::Int=0, nrow::Int=0, skipblank::Bool=true,
+              header::Bool=true, stripheader::Union{Nothing, Base.Chars}=_default_delims,
+              skip::Int=0, nrow::Int=0, skipblank::Bool=true,
               keep::AbstractVector{Bool}=[true for i in 1:length(widths)],
               parsers::AbstractVector{Function}=[identity for i in 1:length(widths)],
               errorlevel::Symbol=:warn)
@@ -154,7 +158,8 @@ end
 `scan(source, blank; skip, nrow, skipblank)
 
 Reads fixed wdith format file or stream `source`.
-Returns a `Vector{Int}` with autotetected withs of fields in `source`.
+Returns `Vector{Tuple{Int,Int}}` with autotetected fields in `source`.
+Detects only fields that exist in all checked lines.
 
 Parameters:
 * `source::Union{IO, AbstractString}`: stream or filename to read from
@@ -192,21 +197,17 @@ function scan(source::IO, blank::Base.Chars=Base._default_delims;
         maxwidth = max(maxwidth, length(line))
         row += 1
     end
-    allblank
-    maxwidth
-    allblank[end] < maxwidth && push!(allblank, maxwidth)
-    pushfirst!(allblank, 0)
-
-    # merge columns containing only blanks
-    callblank = [0]
-    for v in allblank
-        if v > callblank[end] + 1
-            push!(callblank, v)
-        else
-            callblank[end] += 1
+    allblank[end] < maxwidth && push!(allblank, maxwidth+1)
+    last_blank = 0
+    range = Tuple{Int,Int}[]
+    maxwidth == 0 && return range
+    for this_blank in allblank
+        if this_blank > last_blank + 1
+            push!(range, (last_blank+1, this_blank-1))
         end
+        last_blank = this_blank
     end
-    widths = diff(callblank)
+    range
 end
 
 function scan(source::AbstractString, blank::Base.Chars=Base._default_delims;
