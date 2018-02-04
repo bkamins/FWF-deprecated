@@ -42,10 +42,13 @@ function emiterror(msg, errorlevel)
 end
 
 """
-`read(source, widths; header, skip, nrow, skipblank, keep, parsers, errorlevel)`
+`read(source, widths; header, stripheader, skip, nrow, skipblank, keep, parsers, errorlevel)`
+`read(source, ranges; header, stripheader, skip, nrow, skipblank, parsers, errorlevel)`
 
 Reads fixed wdith format file or stream `source` assuming that its fields have widths
-`widths`. Decodes what is possible to decode from a file (`errorlevel` handles reaction
+`widths` (where you can specify by `keep` which columns are kept)
+or you pass `ranges` specifying column ranges to be fetched.
+Decodes what is possible to decode from a file (`errorlevel` handles reaction
 to malformed input data).
 
 Returns a `NamedTuple` with fields:
@@ -58,6 +61,7 @@ by writing `DataFrame(ret...)`.
 Parameters:
 * `source::Union{IO, AbstractString}`: stream or filename to read from
 * `widths::AbstractVector{Int}`: vector of column widths
+* `ranges::AbstractVector{Tuple{Int,Int}}: vector of tuples of column ranges
 * `header::Bool=true`: does `source` contain a header; if not a default header is created
 * `stripheader::Union{Nothing, Base.Chars}: characters to strip from header
 * `skip::Int=0`: number of lines to skip at the beginning of the file
@@ -69,6 +73,7 @@ Parameters:
 * `errorlevel::Symbol`: if `:error` then error is emited if malformed line is encoutered,
   if `:warn` a warning is printed; otherwise nothing happens
 """
+
 function read(source::IO, widths::AbstractVector{Int};
               header::Bool=true, stripheader::Union{Nothing, Base.Chars}=Base._default_delims,
               skip::Int=0, nrow::Int=0, skipblank::Bool=true,
@@ -115,9 +120,20 @@ function read(source::AbstractString, widths::AbstractVector{Int};
               parsers::AbstractVector{Function}=[identity for i in 1:length(widths)],
               errorlevel::Symbol=:warn)
     open(source) do handle
-        readfwf(handle, widths, header=header, skip=skip, nrow=nrow,
-                skipblank=skipblank, keep=keep, parsers=parsers)
+        read(handle, widths, header=header, skipheader=skipheader, skip=skip, nrow=nrow,
+             skipblank=skipblank, keep=keep, parsers=parsers, errorlevel=errorlevel)
     end
+end
+
+
+function read(source::Union{IO, AbstractString}, ranges::AbstractVector{Tuple{Int,Int}};
+              header::Bool=true, stripheader::Union{Nothing, Base.Chars}=_default_delims,
+              skip::Int=0, nrow::Int=0, skipblank::Bool=true,
+              parsers::AbstractVector{Function}=[identity for i in 1:length(widths)],
+              errorlevel::Symbol=:warn)
+    widths, keep = range2width(ranges)
+    read(source, widths, header=header, skipheader=skipheader, skip=skip, nrow=nrow,
+         skipblank=skipblank, keep=keep, parsers=parsers, errorlevel=errorlevel)
 end
 
 """
