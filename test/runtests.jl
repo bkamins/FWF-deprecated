@@ -78,5 +78,8 @@ end
     @test FWF.scan("data/test2.prn", 'X') == [1:48]
     @test FWF.scan("data/test2.prn", skipblank=false) == [1:48]
     @test isempty(FWF.scan("data/test2.prn", nrow=-1))
+    @test FWF.scan("data/test3.prn") == [1:1, 3:5]
+    @test FWF.scan("data/test3.prn", nrow=2) == [1:1, 3:3, 5:5]
+    @test FWF.scan("data/test3.prn", nrow=3) == [1:1, 3:5]
 end
 

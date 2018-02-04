@@ -197,7 +197,8 @@ Parameters:
 * `source::Union{IO, AbstractString}`: stream or filename to read from
 * `blank::Base.Chars=Base._default_delims`: which characters are considered non-data
 * `skip::Int=0`: number of lines to skip at the beginning of the file
-* `nrow::Int=0`: number of rows containing data to read; `0` means to read all data
+* `nrow::Int=0`: number of rows containing data to read (possibly including header);
+  `0` means to read all data
 * `skipblank::Bool=true`: if empty lines shoud be skipped
 """
 function scan(source::IO, blank::Base.Chars=Base._default_delims;
