@@ -44,10 +44,11 @@ end
 """
 `read(source, widths; header, stripheader, skip, nrow, skipblank, keep, parsers, errorlevel)`
 `read(source, ranges; header, stripheader, skip, nrow, skipblank, parsers, errorlevel)`
-
-Reads fixed wdith format file or stream `source` assuming that its fields have widths
-`widths` (where you can specify by `keep` which columns are kept)
-or you pass `ranges` specifying column ranges to be fetched.
+`read(source, blank; header, stripheader, skip, nrow, skipblank, parsers, errorlevel)`
+Reads fixed wdith format file or stream `source` assuming that its fields have:
+* widths `widths` (where you can specify by `keep` which columns are kept);
+* character `ranges` specifying column ranges to be fetched;
+* autodetected widths assuming `blank` is a column separator.
 Decodes what is possible to decode from a file (`errorlevel` handles reaction
 to malformed input data).
 
@@ -62,6 +63,8 @@ Parameters:
 * `source::Union{IO, AbstractString}`: stream or filename to read from
 * `widths::AbstractVector{Int}`: vector of column widths
 * `ranges::AbstractVector{Tuple{Int,Int}}: vector of tuples of column ranges
+* `blank::Base.Chars=Base._default_delims`: characters that are assumed to be blanks for
+  autodetection of columns in the data;
 * `header::Bool=true`: does `source` contain a header; if not a default header is created
 * `stripheader::Union{Nothing, Base.Chars}: characters to strip from header
 * `skip::Int=0`: number of lines to skip at the beginning of the file
@@ -125,13 +128,23 @@ function read(source::AbstractString, widths::AbstractVector{Int};
     end
 end
 
-
 function read(source::Union{IO, AbstractString}, ranges::AbstractVector{Tuple{Int,Int}};
               header::Bool=true, stripheader::Union{Nothing, Base.Chars}=_default_delims,
               skip::Int=0, nrow::Int=0, skipblank::Bool=true,
               parsers::AbstractVector{Function}=[identity for i in 1:length(widths)],
               errorlevel::Symbol=:warn)
     widths, keep = range2width(ranges)
+    read(source, widths, header=header, skipheader=skipheader, skip=skip, nrow=nrow,
+         skipblank=skipblank, keep=keep, parsers=parsers, errorlevel=errorlevel)
+end
+
+# only AbstractString is allowed as we have to scan the file twice
+function read(source::AbstractString, blank::Base.Chars=Base._default_delims;
+              header::Bool=true, stripheader::Union{Nothing, Base.Chars}=_default_delims,
+              skip::Int=0, nrow::Int=0, skipblank::Bool=true,
+              parsers::AbstractVector{Function}=[identity for i in 1:length(widths)],
+              errorlevel::Symbol=:warn)
+    widths, keep = range2width(scan(source, blank, skip=skip, nrow=nrow, skipblank=skipblank))
     read(source, widths, header=header, skipheader=skipheader, skip=skip, nrow=nrow,
          skipblank=skipblank, keep=keep, parsers=parsers, errorlevel=errorlevel)
 end
