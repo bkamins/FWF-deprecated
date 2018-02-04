@@ -68,18 +68,18 @@ end
 end
 
 @testset "scan" begin
-    @test FWF.scan("data/test1.prn") == [1:1, 3:19, 21:48]
-    @test FWF.scan("data/test1.prn", skip=2) == [3:8, 11:16, 21:24, 27:32, 36:40, 44:48]
-    @test FWF.scan("data/test1.prn", [' ';'a':'f']) == [3:8, 11:16, 21:24, 27:32, 36:40, 44:48]
-    @test FWF.scan("data/test2.prn") == [1:1, 3:48]
-    @test FWF.scan("data/test2.prn", skip=1) == [3:8, 11:16, 19:24, 27:32, 37:40, 43:48]
-    @test FWF.scan("data/test2.prn", [' ';'a':'f']) == [3:8, 11:16, 19:24, 27:32, 37:40, 43:48]
-    @test FWF.scan("data/test2.prn", nrow=1) == [1:1, 9:10, 17:19, 25:28, 33:37, 41:46]
-    @test FWF.scan("data/test2.prn", 'X') == [1:48]
-    @test FWF.scan("data/test2.prn", skipblank=false) == [1:48]
-    @test isempty(FWF.scan("data/test2.prn", nrow=-1))
-    @test FWF.scan("data/test3.prn") == [1:1, 3:5]
-    @test FWF.scan("data/test3.prn", nrow=2) == [1:1, 3:3, 5:5]
-    @test FWF.scan("data/test3.prn", nrow=3) == [1:1, 3:5]
+    @test FWF.scan("data/test1.txt") == [1:1, 3:19, 21:48]
+    @test FWF.scan("data/test1.txt", skip=2) == [3:8, 11:16, 21:24, 27:32, 36:40, 44:48]
+    @test FWF.scan("data/test1.txt", [' ';'a':'f']) == [3:8, 11:16, 21:24, 27:32, 36:40, 44:48]
+    @test FWF.scan("data/test2.txt") == [1:1, 3:48]
+    @test FWF.scan("data/test2.txt", skip=1) == [3:8, 11:16, 19:24, 27:32, 37:40, 43:48]
+    @test FWF.scan("data/test2.txt", [' ';'a':'f']) == [3:8, 11:16, 19:24, 27:32, 37:40, 43:48]
+    @test FWF.scan("data/test2.txt", nrow=1) == [1:1, 9:10, 17:19, 25:28, 33:37, 41:46]
+    @test FWF.scan("data/test2.txt", 'X') == [1:48]
+    @test FWF.scan("data/test2.txt", skipblank=false) == [1:48]
+    @test isempty(FWF.scan("data/test2.txt", nrow=-1))
+    @test FWF.scan("data/test3.txt") == [1:1, 3:5]
+    @test FWF.scan("data/test3.txt", nrow=2) == [1:1, 3:3, 5:5]
+    @test FWF.scan("data/test3.txt", nrow=3) == [1:1, 3:5]
 end
 
