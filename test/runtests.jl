@@ -83,3 +83,10 @@ end
     @test FWF.scan("data/test3.txt", nrow=3) == [1:1, 3:5]
 end
 
+@testset "write" begin
+    io = IOBuffer()
+    data = [[1, 2, 31], ["abc", "defg"], [true, false, true], [1, 11, 111]]
+    FWF.write(io, data)
+    @test String(take!(io)) == "1  abc  true  1\n2  defg false 11\n31      true  111\n"
+end
+

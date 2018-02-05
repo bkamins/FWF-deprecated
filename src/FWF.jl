@@ -328,6 +328,12 @@ Parameters:
 * `space::Int=1`: number of `blanks` to insert to separate columns of data
 * `blank::Char=' '`: character to fill blank space with
 * `na::AbstractString=""`: string to be written when missing value is encountered
+
+If you use DataFrames then `df` `DataFrame` can be saved
+by writing `FWF.write(sink, colwise(identity, df), names(df))` or simpler
+`FWF.write(sink, df.columns, names(df))` (but `columns` is not an exported field and
+might change in the future)
+.
 """
 function write(sink::IO, data::AbstractVector, names::Union{Nothing,AbstractVector}=nothing;
                space::Int=1, blank::Char=' ', na::AbstractString="")
