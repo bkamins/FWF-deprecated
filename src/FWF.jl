@@ -290,8 +290,11 @@ end
 
 stringmissing(v, na::String) = ismissing(v) ? na : string(v)
 
-function width(data::AbstractVector, name, na)
+function width(data::AbstractVector, name, na, tooshort)
     width = isa(name, Nothing) ? 0 : length(stringmissing(name, na))
+    if tooshort
+        width = max(width, length(na))
+    end
     for d in data
         width = max(width, length(stringmissing(d, na)))
     end
@@ -302,7 +305,10 @@ function widths(data::AbstractVector, names::Union{Nothing,AbstractVector}, na)
     if !isa(names, Nothing) && length(data) != length(names)
         error("data and name lengths must be identical")
     end
-    [width(v, isa(names, Nothing) ? nothing : names[i], na) for (i, v) in enumerate(data)]
+    ld = length.(data)
+    tooshort = ld .< maximum(ld)
+    [width(v, isa(names, Nothing) ? nothing : names[i], na, tooshort[i])
+     for (i, v) in enumerate(data)]
 end
 
 function writefwf_line(sink::IO, values::Vector{String}, widths::Vector{Int}, blank::Char)
@@ -343,7 +349,7 @@ function write(sink::IO, data::AbstractVector, names::Union{Nothing,AbstractVect
         writefwf_line(sink, stringmissing.(names, na), w, blank)
     end
     for i in 1:maximum(length.(data))
-        values = [length(data[j]) < i ? "" : stringmissing(data[j][i], na) for j in 1:length(data)]
+        values = [length(data[j]) < i ? na : stringmissing(data[j][i], na) for j in 1:length(data)]
         writefwf_line(sink, values, w, blank)
     end
 end

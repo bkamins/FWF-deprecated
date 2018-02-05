@@ -84,9 +84,31 @@ end
 end
 
 @testset "write" begin
-    io = IOBuffer()
     data = [[1, 2, 31], ["abc", "defg"], [true, false, true], [1, 11, 111]]
+    io = IOBuffer()
     FWF.write(io, data)
     @test String(take!(io)) == "1  abc  true  1\n2  defg false 11\n31      true  111\n"
+
+    io = IOBuffer()
+    FWF.write(io, data, ['a', 'b', missing, 'd'], space=3, blank='~', na="missing")
+    @test String(take!(io)) == "a~~~~b~~~~~~~~~missing~~~d\n1~~~~abc~~~~~~~true~~~~~~1\n2~~~~defg~~~~~~false~~~~~11\n31~~~missing~~~true~~~~~~111\n"
+
+    srand(1)
+    data = round.(rand(3,5), 3)
+    io = IOBuffer()
+    FWF.write(io, data, 'a':'e', space=2, blank='|')
+    @test String(take!(io)) == "a||||||b||||||c||||||d||||||e\n0.236||0.008||0.952||0.987||0.425\n0.347||0.489||1.0||||0.556||0.773\n0.313||0.211||0.252||0.437||0.281\n"
+
+    data = convert(Matrix{Union{Missing, Float64}}, data)
+    data[1,1] = missing
+    data[2,2] = missing
+    data[3,5] = missing
+    io = IOBuffer()
+    FWF.write(io, data, 'a':'e', space=2, blank='|')
+    @test String(take!(io)) == "a||||||b||||||c||||||d||||||e\n|||||||0.008||0.952||0.987||0.425\n0.347|||||||||1.0||||0.556||0.773\n0.313||0.211||0.252||0.437||\n"
+
+    io = IOBuffer()
+    FWF.write(io, data, 'a':'e', space=2, blank='|', na="missing")
+    @test String(take!(io)) == "a||||||||b||||||||c||||||d||||||e\nmissing||0.008||||0.952||0.987||0.425\n0.347||||missing||1.0||||0.556||0.773\n0.313||||0.211||||0.252||0.437||missing\n"
 end
 
