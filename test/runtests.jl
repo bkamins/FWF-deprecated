@@ -1,30 +1,10 @@
 # using FWF
 using Test
 
-s = """
-a b c
-1 2 3a
-4 5 6
-7 8 x
-"""
-x = FWF.read(IOBuffer(test), [2,2,1], parsers=[:str, :int, :float])
-@test isequal(x.data, [["1", "4", "7"],[2, 5, 8],[3.0, 6.0, missing]])
-@test x.names == [:a, :b, :c]
-
-io = IOBuffer(UInt8[], false, true)
-m = [1 2 3
-     4 5 6
-     7 missing 9]
-FWF.write(io, m)
-s = String(take!(io))
-ref = """
-1 2 3
-4 5 6
-7   9
-"""
-@test s == ref
-
-# add tests for all scenarios
+@testset "read" begin
+    # TODO: finish it
+    FWF.read("data/test3.txt", [1,1,1,1,1],keep=[true,false,true,false,true])
+end
 
 @testset "range2width" begin
     @test FWF.range2width(UnitRange{Int}[]) == (width=Int[], keep=Int[])
@@ -110,5 +90,9 @@ end
     io = IOBuffer()
     FWF.write(io, data, 'a':'e', space=2, blank='|', na="missing")
     @test String(take!(io)) == "a||||||||b||||||||c||||||d||||||e\nmissing||0.008||||0.952||0.987||0.425\n0.347||||missing||1.0||||0.556||0.773\n0.313||||0.211||||0.252||0.437||missing\n"
+
+    io = IOBuffer()
+    FWF.write(io, data, 'a':'e', space=0, blank='_', na="NA")
+    @test String(take!(io)) == "a____b____c____d____e\nNA___0.0080.9520.9870.425\n0.347NA___1.0__0.5560.773\n0.3130.2110.2520.437NA\n"
 end
 

@@ -38,14 +38,14 @@ function nextline(source, widths, skipblank)
 end
 
 function emiterror(msg, errorlevel)
-    errorlevel == :error && error(msg)
-    errorlevel == :warn && warn(msg)
+    errorlevel == :error && @error msg
+    errorlevel == :warn && @warn msg
 end
 
 """
-`read(source, widths; header, stripheader, skip, nrow, skipblank, keep, parsers, errorlevel)`
-`read(source, ranges; header, stripheader, skip, nrow, skipblank, parsers, errorlevel)`
-`read(source, blank; header, stripheader, skip, nrow, skipblank, parsers, errorlevel)`
+`read(source, widths; header, stripheader, skip, nrow, skipblank, keep, errorlevel)`
+`read(source, ranges; header, stripheader, skip, nrow, skipblank, errorlevel)`
+`read(source, blank; header, stripheader, skip, nrow, skipblank, errorlevel)`
 Reads fixed wdith format file or stream `source` assuming that its fields have:
 * widths `widths` (where you can specify by `keep` which columns are kept);
 * character `ranges` specifying column ranges to be fetched;
@@ -56,6 +56,8 @@ to malformed input data).
 Returns a `NamedTuple` with fields:
 * `data`: vector of vectors containing data
 * `names`: names of data columns as `Symbol`
+
+You can use FWF.impute later if you want to autodetect numeric columns in the data.
 
 If you use DataFrames the return value `ret` can be simply changed to a `DataFrame`
 by writing `DataFrame(ret...)`.
@@ -73,9 +75,6 @@ Parameters:
 * `nrow::Int=0`: number of rows containing data to read; `0` means to read all data
 * `skipblank::Bool=true`: if empty lines shoud be skipped
 * `keep::AbstractVector{Bool}=[true...]`: which columns should be retained in the result
-* `parsers::AbstractVector{Function}=[identity...]`: list of parsers functions;
-   must have the same number of elements as `widths`; by default no parsing is performed;
-   you can use FWF.impute later if you want to autodetect numeric columns in the data
 * `errorlevel::Symbol`: if `:error` then error is emited if malformed line is encoutered,
   if `:warn` a warning is printed; otherwise nothing happens
 """
@@ -83,9 +82,7 @@ function read(source::IO, widths::AbstractVector{Int};
               header::Bool=true, stripheader::Union{Nothing, Base.Chars}=Base._default_delims,
               skip::Int=0, nrow::Int=0, skipblank::Bool=true,
               keep::AbstractVector{Bool}=[true for i in 1:length(widths)],
-              parsers::AbstractVector{Function}=[identity for i in 1:length(widths)],
               errorlevel::Symbol=:warn)
-    length(parsers) == length(widths) || throw(ArgumentError("wrong number of parserss"))
     length(keep) == length(widths) || throw(ArgumentError("wrong length of keep"))
     all(x -> x > 0, widths) || throw(ArgumentError("field widths must be positive"))
     for i in 1:skip
@@ -115,41 +112,37 @@ function read(source::IO, widths::AbstractVector{Int};
     end
     # TODO: properly handle Missing in Union; to be fixed in Julia 0.7 hopefully
     # TODO: check eof without skipblank
-    data = Any[parsers[i].(rawdata[i]) for i in 1:length(rawdata)]
-    (data=data[keep], names=head[keep])
+    (data=rawdata[keep], names=head[keep])
 end
 
 function read(source::AbstractString, widths::AbstractVector{Int};
-              header::Bool=true, stripheader::Union{Nothing, Base.Chars}=_default_delims,
+              header::Bool=true, stripheader::Union{Nothing, Base.Chars}=Base._default_delims,
               skip::Int=0, nrow::Int=0, skipblank::Bool=true,
               keep::AbstractVector{Bool}=[true for i in 1:length(widths)],
-              parsers::AbstractVector{Function}=[identity for i in 1:length(widths)],
               errorlevel::Symbol=:warn)
     open(source) do handle
-        read(handle, widths, header=header, skipheader=skipheader, skip=skip, nrow=nrow,
-             skipblank=skipblank, keep=keep, parsers=parsers, errorlevel=errorlevel)
+        read(handle, widths, header=header, stripheader=stripheader, skip=skip, nrow=nrow,
+             skipblank=skipblank, keep=keep, errorlevel=errorlevel)
     end
 end
 
 function read(source::Union{IO, AbstractString}, ranges::AbstractVector{UnitRange{Int}};
-              header::Bool=true, stripheader::Union{Nothing, Base.Chars}=_default_delims,
+              header::Bool=true, stripheader::Union{Nothing, Base.Chars}=Base._default_delims,
               skip::Int=0, nrow::Int=0, skipblank::Bool=true,
-              parsers::AbstractVector{Function}=[identity for i in 1:length(widths)],
               errorlevel::Symbol=:warn)
     widths, keep = range2width(ranges)
-    read(source, widths, header=header, skipheader=skipheader, skip=skip, nrow=nrow,
-         skipblank=skipblank, keep=keep, parsers=parsers, errorlevel=errorlevel)
+    read(source, widths, header=header, stripheader=stripheader, skip=skip, nrow=nrow,
+         skipblank=skipblank, keep=keep, errorlevel=errorlevel)
 end
 
 # only AbstractString is allowed as we have to scan the file twice
 function read(source::AbstractString, blank::Base.Chars=Base._default_delims;
-              header::Bool=true, stripheader::Union{Nothing, Base.Chars}=_default_delims,
+              header::Bool=true, stripheader::Union{Nothing, Base.Chars}=Base._default_delims,
               skip::Int=0, nrow::Int=0, skipblank::Bool=true,
-              parsers::AbstractVector{Function}=[identity for i in 1:length(widths)],
               errorlevel::Symbol=:warn)
     widths, keep = range2width(scan(source, blank, skip=skip, nrow=nrow, skipblank=skipblank))
-    read(source, widths, header=header, skipheader=skipheader, skip=skip, nrow=nrow,
-         skipblank=skipblank, keep=keep, parsers=parsers, errorlevel=errorlevel)
+    read(source, widths, header=header, stripheader=stripheader, skip=skip, nrow=nrow,
+         skipblank=skipblank, keep=keep, errorlevel=errorlevel)
 end
 
 """
@@ -343,7 +336,7 @@ might change in the future)
 """
 function write(sink::IO, data::AbstractVector, names::Union{Nothing,AbstractVector}=nothing;
                space::Int=1, blank::Char=' ', na::AbstractString="")
-    space > 0 || error("space must be positive")
+    space ≥ 0 || error("space must be non-negative")
     w = widths(data, names, na) .+ space
     if !isa(names, Nothing)
         writefwf_line(sink, stringmissing.(names, na), w, blank)
