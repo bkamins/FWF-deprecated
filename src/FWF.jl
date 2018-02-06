@@ -31,9 +31,7 @@ function nextline(source, widths, skipblank)
     while skipblank && isempty(line) && !eof(source)
         line = readline(source)
     end
-    # special case if we skip blanks and find only empty lines
-    # TODO: rethink it
-    skipblank && isempty(line) && eof(source) && return (Vector{SubString{String}}[], false)
+    isempty(line) && eof(source) && return (Vector{SubString{String}}[], false)
     parsefwf_line(line, widths)
 end
 
@@ -93,10 +91,10 @@ function read(source::IO, widths::AbstractVector{Int};
         if malformed || length(pline) == 0
             emiterror("Header was required and is malformed", errorlevel)
         end
-        sline = stripheader === nothing ? pline : strip.(pline, stripheader)
+        sline = stripheader === nothing ? pline : strip.(pline, [stripheader])
         head = Symbol.(sline)
     else
-        head = Symbol.(["x$i" for i in 1:length(widths)])
+        head = Symbol.(["x$i" for i in 1:count(keep)])
     end
 
     rawdata = [SubString{String}[] for i in 1:length(widths)]
@@ -110,8 +108,6 @@ function read(source::IO, widths::AbstractVector{Int};
             push!(rawdata[i], pline[i])
         end
     end
-    # TODO: properly handle Missing in Union; to be fixed in Julia 0.7 hopefully
-    # TODO: check eof without skipblank
     (data=rawdata[keep], names=head[keep])
 end
 
@@ -210,8 +206,8 @@ function scan(source::IO, blank::Base.Chars=Base._default_delims;
             while isempty(line) && !eof(source)
                 line = readline(source)
             end
-            isempty(line) && eof(source) && break
         end
+        isempty(line) && eof(source) && break
         thisblank = Int[]
         for (i, c) in enumerate(line)
             c in blank && push!(thisblank, i)
