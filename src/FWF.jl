@@ -36,8 +36,8 @@ function nextline(source, widths, skipblank)
 end
 
 function emiterror(msg, errorlevel)
-    errorlevel == :error && @error msg
-    errorlevel == :warn && @warn msg
+    errorlevel == :error && error(msg)
+    errorlevel == :warn && println(STDERR, "Warning: " * msg)
 end
 
 """
@@ -73,14 +73,14 @@ Parameters:
 * `nrow::Int=0`: number of rows containing data to read; `0` means to read all data
 * `skipblank::Bool=true`: if empty lines shoud be skipped
 * `keep::AbstractVector{Bool}=[true...]`: which columns should be retained in the result
-* `errorlevel::Symbol`: if `:error` then error is emited if malformed line is encoutered,
+* `errorlevel`: if `:error` then error is emited if malformed line is encoutered,
   if `:warn` a warning is printed; otherwise nothing happens
 """
 function read(source::IO, widths::AbstractVector{Int};
               header::Bool=true, stripheader::Union{Nothing, Base.Chars}=Base._default_delims,
               skip::Int=0, nrow::Int=0, skipblank::Bool=true,
               keep::AbstractVector{Bool}=[true for i in 1:length(widths)],
-              errorlevel::Symbol=:warn)
+              errorlevel=:warn)
     length(keep) == length(widths) || throw(ArgumentError("wrong length of keep"))
     all(x -> x > 0, widths) || throw(ArgumentError("field widths must be positive"))
     for i in 1:skip
@@ -93,8 +93,6 @@ function read(source::IO, widths::AbstractVector{Int};
         end
         sline = stripheader === nothing ? pline : strip.(pline, [stripheader])
         head = Symbol.(sline)
-    else
-        head = Symbol.(["x$i" for i in 1:count(keep)])
     end
 
     rawdata = [SubString{String}[] for i in 1:length(widths)]
@@ -108,14 +106,14 @@ function read(source::IO, widths::AbstractVector{Int};
             push!(rawdata[i], pline[i])
         end
     end
-    (data=rawdata[keep], names=head[keep])
+    (data=rawdata[keep], names=header ? head[keep] : Symbol.(["x$i" for i in 1:count(keep)]))
 end
 
 function read(source::AbstractString, widths::AbstractVector{Int};
               header::Bool=true, stripheader::Union{Nothing, Base.Chars}=Base._default_delims,
               skip::Int=0, nrow::Int=0, skipblank::Bool=true,
               keep::AbstractVector{Bool}=[true for i in 1:length(widths)],
-              errorlevel::Symbol=:warn)
+              errorlevel=:warn)
     open(source) do handle
         read(handle, widths, header=header, stripheader=stripheader, skip=skip, nrow=nrow,
              skipblank=skipblank, keep=keep, errorlevel=errorlevel)
@@ -125,7 +123,7 @@ end
 function read(source::Union{IO, AbstractString}, ranges::AbstractVector{UnitRange{Int}};
               header::Bool=true, stripheader::Union{Nothing, Base.Chars}=Base._default_delims,
               skip::Int=0, nrow::Int=0, skipblank::Bool=true,
-              errorlevel::Symbol=:warn)
+              errorlevel=:warn)
     widths, keep = range2width(ranges)
     read(source, widths, header=header, stripheader=stripheader, skip=skip, nrow=nrow,
          skipblank=skipblank, keep=keep, errorlevel=errorlevel)
@@ -135,7 +133,7 @@ end
 function read(source::AbstractString, blank::Base.Chars=Base._default_delims;
               header::Bool=true, stripheader::Union{Nothing, Base.Chars}=Base._default_delims,
               skip::Int=0, nrow::Int=0, skipblank::Bool=true,
-              errorlevel::Symbol=:warn)
+              errorlevel=:warn)
     widths, keep = range2width(scan(source, blank, skip=skip, nrow=nrow, skipblank=skipblank))
     read(source, widths, header=header, stripheader=stripheader, skip=skip, nrow=nrow,
          skipblank=skipblank, keep=keep, errorlevel=errorlevel)

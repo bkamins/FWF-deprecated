@@ -9,7 +9,9 @@ using Test
                 ["  0.4868", "    0.09", "    0.88"],
                 ["   0.846", "    0.15", "     0.4"]]
     @test n == [ :a, :bb, :ccc, :dddd, :eeeee]
-    d, n = FWF.read("data/test1.txt", [8,8,8,8,8], skipblank=false, skip=1)
+    @test_warn "Warning: Malformed actual data line number 1" FWF.read("data/test1.txt", [8,8,8,8,8], skipblank=false, skip=1)
+    @test_throws ErrorException FWF.read("data/test1.txt", [8,8,8,8,8], skipblank=false, skip=1, errorlevel=:error)
+    d, n = FWF.read("data/test1.txt", [8,8,8,8,8], skipblank=false, skip=1, errorlevel=nothing)
     @test d == [["", "     0.8", "   0.103", "  0.3164"],
                 ["", "  0.4093", "  0.4704", "    0.16"],
                 ["", "     0.7", "    0.12", "    0.85"],
@@ -34,21 +36,23 @@ using Test
                 ["0.4868", "  0.09", "  0.88"],
                 ["0.846", " 0.15", "  0.4"],
                 [" 0.79", " 0.15", "0.349"]]
-    @test n == [:x1, :x2, :x3, :x4, :x5]
-    d, n = FWF.read("data/test2.txt", [8,8,8,8,8], skipblank=false)
+    @test n == [:x1, :x2, :x3, :x4, :x5, :x6]
+    @test_warn "Warning: Malformed actual data line number 3" FWF.read("data/test2.txt", [8,8,8,8,8], skipblank=false)
+    d, n = FWF.read("data/test2.txt", [8,8,8,8,8], skipblank=false, errorlevel=nothing)
     @test d ==  [["   0.477", "  0.8395", "", "  0.4477"],
                  ["     0.3", "  0.2405", "", "    0.57"],
                  ["  0.2039", "     0.3", "", "       0"],
                  ["     0.5", "   0.526", "", "  0.0512"],
                  ["    0.77", "       1", "", "    0.93"]]
     @test n == [:a, :bb, :ccc, :dddd, :eeeee]
-    d, n = FWF.read("data/test3.txt", [1,1,1,1,1],keep=[true,false,true,false,true])
+    @test_warn "Warning: Malformed actual data line number 2" FWF.read("data/test3.txt", [1,1,1,1,1],keep=[true,false,true,false,true])
+    d, n = FWF.read("data/test3.txt", [1,1,1,1,1],keep=[true,false,true,false,true], errorlevel=nothing)
     @test d ==  [["1", "1", " "], ["2", "2", "2"], ["3", "", "3"]]
     @test n == [:a, :b, :c]
-    d, n = FWF.read("data/test3.txt", [1:1, 3:3, 5:5])
+    d, n = FWF.read("data/test3.txt", [1:1, 3:3, 5:5], errorlevel=:no)
     @test d ==  [["1", "1", " "], ["2", "2", "2"], ["3", "", "3"]]
     @test n == [:a, :b, :c]
-    d, n = FWF.read("data/test3.txt", ' ')
+    d, n = FWF.read("data/test3.txt", ' ', errorlevel=:no)
     @test d ==  [["1", "1", " "], ["2 3", "2", "2 3"]]
     @test n == [:a, Symbol("b c")]
 end
