@@ -34,24 +34,24 @@ julia> x = reshape(1:20, 5, 4)
  4   9  14  19
  5  10  15  20
 
-julia> fname = tempname(); FWF.write(fname, x, Symbol.('a':'d'), blank='-')
+julia> fname = tempname(); FWF.write(fname, x, Symbol.('a':'d'), blank='~')
 
-julia> readlines(fname)
-6-element Array{String,1}:
- "a-b--c--d"
- "1-6--11-16"
- "2-7--12-17"
- "3-8--13-18"
- "4-9--14-19"
- "5-10-15-20"
+julia> readlines(fname) # see what is in the file, use '~` to clearly see what was written
+6~element Array{String,1}:
+ "a~b~~c~~d"
+ "1~6~~11~16"
+ "2~7~~12~17"
+ "3~8~~13~18"
+ "4~9~~14~19"
+ "5~10~15~20"
 
-julia> y = FWF.read(fname, '-', stripheader='-')
-(data = Array{SubString{String},1}[["1", "2", "3", "4", "5"], ["6-", "7-", "8-", "9-", "10"], ["11", "12", "13", "14", "15"], ["16", "17", "18", "19", "20"]], names = Symbol[:a, :b, :c, :d])
+julia> y = FWF.read(fname, '~', stripheader='~')
+(data = Array{SubString{String},1}[["1", "2", "3", "4", "5"], ["6~", "7~", "8~", "9~", "10"], ["11", "12", "13", "14", "15"], ["16", "17", "18", "19", "20"]], names = Symbol[:a, :b, :c, :d])
 
 julia> y.data
 4-element Array{Array{SubString{String},1},1}:
  ["1", "2", "3", "4", "5"]
- ["6-", "7-", "8-", "9-", "10"]
+ ["6~", "7~", "8~", "9~", "10"]
  ["11", "12", "13", "14", "15"]
  ["16", "17", "18", "19", "20"]
 
@@ -63,5 +63,19 @@ julia> y.names
  :d
 
 julia> rm(fname, force=true)
+
+julia> d = map(v -> strip.(v, '~'), y.data)
+4-element Array{Array{SubString{String},1},1}:
+ ["1", "2", "3", "4", "5"]
+ ["6", "7", "8", "9", "10"]
+ ["11", "12", "13", "14", "15"]
+ ["16", "17", "18", "19", "20"]
+
+julia> FWF.impute.(d) # we could use it directly if our blank would be space not '~'
+4-element Array{Array{Int64,1},1}:
+ [1, 2, 3, 4, 5]
+ [6, 7, 8, 9, 10]
+ [11, 12, 13, 14, 15]
+ [16, 17, 18, 19, 20]
 ```
 
