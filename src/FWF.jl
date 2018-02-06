@@ -17,7 +17,9 @@ function parsefwf_line(line, widths::AbstractVector{Int})
         j = nextind(line, i, w)
         if j > e
             j = e
-            malformed = true
+            if k < length(widths)
+                malformed = true
+            end
         end
         buf[idx] = SubString(line, i+1, j)
         i = j
