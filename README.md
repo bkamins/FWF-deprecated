@@ -13,7 +13,7 @@ The module does not have any depenencies, but is designed to allow for a simple
 integration with other packages like *DataFrames*.
 It is designed for rather small data as it is not optimized for speed (yet).
 
-# Available functions
+## Available functions
 * reading file: `FWF.read` (performs no conversion of read data except optional stripping of header); accepted formats of field widths specification:
     1. a vector of field widths, e.g. `[1,2,3]`, with optional setting of `keep` keyword argument which fields should be retained
     2. a vector of `UnitRanges` indicating start and stop index of a field, e.g. `[1:2, 4:7, 9:10]`
@@ -23,9 +23,9 @@ It is designed for rather small data as it is not optimized for speed (yet).
 * writing file: `FWF.write`
 * impute field types after reading data: `FWF.impute` (often needed as `FWF.read` does not transform the data read)
 
-# Example session
+## Example session
 
-```
+```julia
 julia> x = reshape(1:20, 5, 4)
 5×4 reshape(::UnitRange{Int64}, 5, 4) with eltype Int64:
  1   6  11  16
