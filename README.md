@@ -6,6 +6,8 @@ FWF
 
 *A simple package for working with fixed width format files*
 
+To be merged into https://github.com/RandomString123/FWF.jl.
+
 This package is ready for friendly tests.
 
 The module does not export any methods. Usage is documented in docstrings.
